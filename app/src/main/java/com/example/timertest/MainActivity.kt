@@ -6,6 +6,7 @@ import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -19,9 +20,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         findViewById<Button>(R.id.reportCrash).setOnClickListener {
             if (isExceptionsCountInRage(3, 10)) {
-                Log.d("Reporting", "sendreport")
+                //Log.d("Reporting", "sending report")
             } else {
-                Log.d("Reporting", "ignore report")
+                //Log.d("Reporting", "ignore report")
             }
         }
     }
@@ -34,16 +35,23 @@ class MainActivity : AppCompatActivity() {
         queueString?.let {
             val type = object : TypeToken<Queue<Long>>() {}.type
             val queue = gson.fromJson<Queue<Long>>(queueString, type)
+            Log.d("Reporting","queueItems")
+            queue.iterator().forEach {
+                Log.d("Reporting", getDateWithSeconds(it))
+            }
+
             if (queue.size >= count) {
                 queue.element()?.let { firstCapturedTimeInQueue ->
                     val currentTime = System.currentTimeMillis()
                     val differenceTimeInMins = TimeUnit.MILLISECONDS.toSeconds(currentTime - firstCapturedTimeInQueue)
                     return if (differenceTimeInMins < timeInSeconds) {
+                        Log.d("Reporting", "ignoring report at " +getDateWithSeconds(currentTime))
                         false
                     } else {
                         queue.remove()
                         queue.add(currentTime)
                         sharedPreference.putString(CRASH_TIME_QUEUE_DATA, gson.toJson(queue))
+                        Log.d("Reporting", "sending report at " +getDateWithSeconds(currentTime))
                         true
                     }
                 }
@@ -51,13 +59,25 @@ class MainActivity : AppCompatActivity() {
                 val currentTime = System.currentTimeMillis()
                 queue.add(currentTime)
                 sharedPreference.putString(CRASH_TIME_QUEUE_DATA, gson.toJson(queue))
+                Log.d("Reporting", "sending report at " +getDateWithSeconds(currentTime))
                 return true
             }
         } ?: kotlin.run {
             val queue: Queue<Long> = LinkedList(emptyList())
-            queue.add(System.currentTimeMillis())
+            val currentTime = System.currentTimeMillis()
+            queue.add(currentTime)
             sharedPreference.putString(CRASH_TIME_QUEUE_DATA, gson.toJson(queue))
+            Log.d("Reporting", "sending report at " +getDateWithSeconds(currentTime))
             return true
         }
+
+    }
+
+    fun getDateWithSeconds(milliSeconds: Long): String {
+        val dateFormat = "dd/MM/yyyy hh:mm:ss"
+        val formatter = SimpleDateFormat(dateFormat)
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = milliSeconds
+        return formatter.format(calendar.time)
     }
 }
